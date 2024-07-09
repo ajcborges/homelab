@@ -38,3 +38,12 @@ terraform.rc
 
 .env
 *token*
+
+.DS_Store
+
+# Ignore Ansible Cofiguration files
+.secrets
+inventory
+ansible.cfg
+vars
+defaults
