@@ -1,0 +1,157 @@
+---
+# tasks file for ansible-role-proxmox-lxc-config
+- name: Update, Upgrade and Clean/Remove useless Packages
+  ansible.builtin.apt:
+    update_cache: true
+    upgrade: true
+    autoclean: true
+    autoremove: true
+  changed_when: ansible_distribution in ["Debian", "Ubuntu"]
+  delegate_to: "{{ lxc_hostname }}"
+
+- name: Set timezone to "{{ lxc_timezone }}"
+  community.general.timezone:
+    name: "{{ lxc_timezone }}"
+  changed_when: ansible_distribution in ["Debian", "Ubuntu"]
+  delegate_to: "{{ lxc_hostname }}"
+
+- name: Install Essentials Packages ("{{ lxc_packages }}")
+  ansible.builtin.package:
+    name: "{{ lxc_packages }}"
+    state: present
+  changed_when: ansible_distribution in ["Debian", "Ubuntu"]
+  delegate_to: "{{ lxc_hostname }}"
+
+# - name: Adding 'pipx to the PATH'
+#   ansible.builtin.command: "pipx ensurepath"
+#   ignore_errors: true
+#   delegate_to: "{{ lxc_hostname }}"
+
+- name: Check if Docker is installed on {{ lxc_hostname }}
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  register: docker_check_result
+  ignore_errors: true
+  with_items:
+    - /usr/bin/docker
+    - /usr/local/bin/docker
+    - /opt/bin/docker
+  delegate_to: "{{ lxc_hostname }}"
+
+- name: Download Docker script if not present
+  ansible.builtin.get_url:
+    url: https://get.docker.com
+    dest: /tmp/get-docker.sh
+    mode: "0755"
+  when: not docker_check_result.results | map(attribute='stat.exists') | bool
+  delegate_to: "{{ lxc_hostname }}"
+
+- name: Execute Docker installation script
+  ansible.builtin.command: sh /tmp/get-docker.sh
+  args:
+    creates: /usr/bin/docker  # Specify a file that indicates Docker is installed
+  when: not docker_check_result.results | map(attribute='stat.exists') | bool
+  delegate_to: "{{ lxc_hostname }}"
+  notify: Remove the temporary Docker installation script
+
+- name: Check the existence of the user "{{ lxc_nonroot_username }}"
+  ansible.builtin.command: "getent passwd {{ lxc_nonroot_username }}"
+  register: user_check
+  ignore_errors: true
+  delegate_to: "{{ lxc_hostname }}"
+
+- name: Create and assign sudo and docker group to the user "{{ lxc_nonroot_username }}"
+  ansible.builtin.user:
+    name: "{{ lxc_nonroot_username }}"
+    password: "{{ lxc_nonroot_password | password_hash('sha512') }}"
+    groups: "sudo,docker"
+    shell: "/bin/bash"
+    state: present
+  changed_when: user_check.rc != 0
+  delegate_to: "{{ lxc_hostname }}"
+
+- name: Ensure SSH daemon is running.
+  ansible.builtin.systemd:
+    name: "{{ security_sshd_name }}"
+    state: "{{ security_sshd_state }}"
+  delegate_to: "{{ lxc_hostname }}"
+
+# - name: Update SSH configuration to be more secure with sshd_config.j2
+#   ansible.builtin.template:
+#     src: ../templates/sshd_config.j2
+#     dest: "{{ security_ssh_config_path }}"
+#     mode: "0644"
+#   notify: Restart ssh
+#   delegate_to: "{{ lxc_hostname }}"
+
+# - name: Ensure the mount points exist
+#   ansible.builtin.file:
+#     path: "{{ item.path }}"
+#     owner: "{{ lxc_nonroot_username }}"
+#     group: "{{ lxc_nonroot_username }}"
+#     mode: '0755'
+#     state: directory
+#   loop:
+#     - { path: /mnt/containers/ }
+#     - { path: /mnt/public/ }
+
+# - name: Mount network share in /etc/fstab
+#   ansible.posix.mount:
+#     path: "{{ item.path }}"
+#     src: "//{{ nas_host }}/{{ item.dir }}"
+#     fstype: cifs
+#     opts: "guest,iocharset=utf8,auto,_netdev,sec=ntlmssp,rw,soft,nobrl,file_mode=0755,dir_mode=0755,uid={{ lxc_nonroot_username }},gid={{ lxc_nonroot_username }}"
+#     state: mounted
+#   delegate_to: "{{ lxc_hostname }}"
+#   with_items:
+#     - { path: /mnt/containers/, dir: containers }
+#     - { path: /mnt/public/, dir: public }
+
+- name: Check if ~/.hushlogin exists
+  ansible.builtin.stat:
+    path: "/home/{{ lxc_nonroot_username }}/.hushlogin"
+  register: hushlogin_stat
+  delegate_to: "{{ lxc_hostname }}"
+
+- name: Create ~/.hushlogin if it doesn't exist and set permissions, owner, and group
+  ansible.builtin.file:
+    path: "/home/{{ lxc_nonroot_username }}/.hushlogin"
+    mode: "0644"
+    owner: "{{ lxc_nonroot_username }}"
+    group: "{{ lxc_nonroot_username }}"
+    state: touch
+  when: not hushlogin_stat.stat.exists
+  delegate_to: "{{ lxc_hostname }}"
+
+- name: Add neofetch launch to user's shell configuration
+  ansible.builtin.blockinfile:
+    path: "/home/{{ lxc_nonroot_username }}/.bashrc"
+    block: |
+      # Launch neofetch on login
+      if [ -x "$(command -v neofetch)" ]; then
+        neofetch
+      fi
+  delegate_to: "{{ lxc_hostname }}"
+
+- name: Create an .ssh directory
+  ansible.builtin.file:
+    # Replace with the desired directory path
+    path: "/home/{{ lxc_nonroot_username }}/.ssh"
+    state: directory
+    owner: "{{ lxc_nonroot_username }}"  # Replace with the desired remote user
+    group: "{{ lxc_nonroot_username }}"  # Replace with the desired remote group
+    mode: "0700"  # Set the desired directory permissions
+  delegate_to: "{{ lxc_hostname }}"
+
+- name: Copy automation_agent public ssh-key to remote machine
+  ansible.builtin.copy:
+    content: "{{ lxc_pubkey }}"
+    dest: "/home/{{ lxc_nonroot_username }}/.ssh/authorized_keys"
+    mode: "0600"
+    owner: "{{ lxc_nonroot_username }}"
+    group: "{{ lxc_nonroot_username }}"
+  delegate_to: "{{ lxc_hostname }}"
+
+- name: Reboot the machine
+  ansible.builtin.reboot:
+  delegate_to: "{{ lxc_hostname }}"
