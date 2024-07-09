@@ -1,0 +1,3 @@
+path = "terraform.tfstate.d/k3s-minion-one.tfstate"
+
+

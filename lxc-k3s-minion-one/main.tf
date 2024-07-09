@@ -1,6 +1,5 @@
 module "proxmox_lxc" {
   source = "git::https://github.com/ajcborges/terraform-modules.git//proxmox_lxc?ref=cb4354c"
-  #source = "./modules/common/"
 
   proxmox_node          = var.proxmox_node          # String containing the cluster node name.
   proxmox_resource_pool = var.proxmox_resource_pool # The name of the Proxmox resource pool to add this container to.
@@ -21,10 +20,10 @@ module "proxmox_lxc" {
   lxc_start_on_create = var.lxc_start_on_create # A boolean that determines if the container is started after creation.
   lxc_protection      = var.lxc_protection      # A boolean that enables the protection flag on this container. 
 
-  lxc_enable_fuse         = var.lxc_enable_fuse                    # A boolean for enabling FUSE mounts.
-  lxc_enable_keyctl       = var.lxc_enable_keyctl                  # A boolean for enabling the keyctl() system call.
+  lxc_enable_fuse         = var.lxc_enable_fuse         # A boolean for enabling FUSE mounts.
+  lxc_enable_keyctl       = var.lxc_enable_keyctl       # A boolean for enabling the keyctl() system call.
   lxc_allowed_mount_types = var.lxc_allowed_mount_types # Defines the filesystem types (separated by semicolons) that are allowed to be mounted.
-  lxc_enable_nesting      = var.lxc_enable_nesting                 # A boolean to allow nested virtualization.
+  lxc_enable_nesting      = var.lxc_enable_nesting      # A boolean to allow nested virtualization.
 
 
   lxc_cores       = var.lxc_cores       # The number of cores assigned to the container. A container can use all available cores by default.
@@ -32,8 +31,8 @@ module "proxmox_lxc" {
   lxc_swap_memory = var.lxc_swap_memory #A number that sets the amount of swap memory available to the container.
 
   # Terraform will crash without rootfs defined
-  lxc_rootfs_storage_volume = var.lxc_rootfs_storage_volume         # A string containing the volume , directory, or device to be mounted into the container (at the path specified by mp)
-  lxc_rootfs_size_gb        = var.lxc_rootfs_size_gb # Size of the underlying volume. Must end in T, G, M, or K. Note that this is a read only value.
+  lxc_rootfs_storage_volume = var.lxc_rootfs_storage_volume # A string containing the volume , directory, or device to be mounted into the container (at the path specified by mp)
+  lxc_rootfs_size_gb        = var.lxc_rootfs_size_gb        # Size of the underlying volume. Must end in T, G, M, or K. Note that this is a read only value.
 
 
   # mountpoint { # An object for defining a volume to use as a container mount point. Can be specified multiple times.
