@@ -1,0 +1,74 @@
+---
+- name: Update apt cache, Upgrade, and Clean/Remove useless Packages
+  ansible.builtin.apt:
+    update_cache: true
+    upgrade: dist
+    autoclean: true
+    autoremove: true
+  when: ansible_distribution in ["Debian", "Ubuntu"]
+
+- name: Set timezone to "{{ prereq_lxc_timezone }}"
+  community.general.timezone:
+    name: "{{ prereq_lxc_timezone }}"
+  changed_when: ansible_distribution in ["Debian", "Ubuntu"]
+
+- name: Enable IPv4 forwarding
+  ansible.posix.sysctl:
+    name: net.ipv4.ip_forward
+    value: "1"
+    state: present
+    reload: true
+  tags: sysctl
+
+- name: Enable IPv6 forwarding
+  ansible.posix.sysctl:
+    name: net.ipv6.conf.all.forwarding
+    value: "1"
+    state: present
+    reload: true
+  tags: sysctl
+
+- name: Enable IPv6 router advertisements
+  ansible.posix.sysctl:
+    name: net.ipv6.conf.all.accept_ra
+    value: "2"
+    state: present
+    reload: true
+  tags: sysctl
+
+- name: Install Essentials Packages ("{{ prereq_lxc_packages }}")
+  ansible.builtin.package:
+    name: "{{ prereq_lxc_packages }}"
+    state: present
+  changed_when: ansible_distribution in ["Debian", "Ubuntu"]
+
+- name: Add /usr/local/bin to sudo secure_path
+  ansible.builtin.lineinfile:
+    line: 'Defaults    secure_path = {{ prereq_secure_path[ansible_os_family] }}'
+    regexp: "Defaults(\\s)*secure_path(\\s)*="
+    state: present
+    insertafter: EOF
+    path: /etc/sudoers
+    validate: 'visudo -cf %s'
+  changed_when: ansible_distribution in ["Debian", "Ubuntu"]
+
+- name: Check if swap is enabled
+  ansible.builtin.command: swapon --summary
+  register: swap_check
+  ignore_errors: true
+  changed_when: false
+
+- name: Disable swap
+  ansible.builtin.command: swapoff --all
+  become: true
+  when: swap_check.stdout != ""
+  changed_when: false
+  register: swapoff_result
+  failed_when: swapoff_result.rc not in [0, 32]
+
+- name: Remove swap entry from /etc/fstab
+  ansible.builtin.replace:
+    path: /etc/fstab
+    regexp: '^\s*([^#\s]+\s+){2}swap\s+'
+    replace: '# \g<0>'
+    backup: true

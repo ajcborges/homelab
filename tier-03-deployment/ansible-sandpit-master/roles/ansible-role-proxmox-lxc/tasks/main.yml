@@ -1,7 +1,0 @@
----
-- name: Configuration Proxmox LXC container
-  ansible.builtin.include_tasks: config_lxc.yml
-  no_log: true  # Prevents leaking the password, cf. #3
-  tags:
-    - config
-    

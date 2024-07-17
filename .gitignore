@@ -47,3 +47,5 @@ inventory
 ansible.cfg
 vars
 defaults
+
+.vscode/settings.json

@@ -1,8 +1,0 @@
-- name: LXC Tier 02 Configuration for homelab
-  hosts: omega
-
-  tasks:
-    - name: LXC Configuration
-      ansible.builtin.include_role:
-        name: ansible-role-proxmox-lxc
-

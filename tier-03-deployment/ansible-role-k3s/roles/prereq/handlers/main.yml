@@ -1,0 +1,26 @@
+---
+# handlers file for ansible-role-proxmox-lxc
+# handlers file for lxc-template
+- name: Restart ssh
+  ansible.builtin.service:
+    name: sshd
+    state: restarted
+
+- name: Remove the temporary Docker installation script
+  ansible.builtin.file:
+    path: /tmp/get-docker.sh
+    state: absent
+  when: not docker_check_result.results | map(attribute='stat.exists') | bool
+
+# - name: Reboot containers
+#   block:
+#     - name: Get container ids from filtered files
+#       set_fact:
+#         proxmox_lxc_filtered_ids: >-
+#           {{ proxmox_lxc_filtered_files | map("split", "/") | map("last") | map("split", ".") | map("first") }}
+#       listen: reboot containers
+#     - name: Reboot container
+#       command: "pct reboot {{ item }}"
+#       loop: "{{ proxmox_lxc_filtered_ids }}"
+#       changed_when: true
+#       listen: reboot containers

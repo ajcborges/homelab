@@ -1,0 +1,52 @@
+---
+# k3s Installation
+- name: Delete k3s if already present
+  ansible.builtin.file:
+    path: "{{ master_k3s_install_path }}"
+    state: absent
+
+- name: Download k3s install script
+  ansible.builtin.get_url:
+    url: "{{ master_k3s_install_url }}"
+    dest: "{{ master_k3s_install_path }}"
+    mode: 'u+x'
+
+- name: Install k3s as Master
+  ansible.builtin.command: sh {{ master_k3s_install_path }}
+  args:
+    creates: "{{ master_k3s_executable_path }}"
+  environment:
+    INSTALL_K3S_EXEC: "{{ master_k3s_install_options }}"
+
+- name: Verify k3s installation
+  ansible.builtin.command: kubectl version --client
+  register: k3s_version
+  changed_when: false
+
+- name: Display k3s version
+  ansible.builtin.debug:
+    msg: "Installed k3s version: {{ k3s_version.stdout }}"
+
+- name: Read K3s token
+  ansible.builtin.command: cat /var/lib/rancher/k3s/server/node-token
+  register: k3s_token_output
+  changed_when: false
+
+# - name: Save token to variable
+#   ansible.builtin.set_fact:
+#     k3s_token: "{{ k3s_token_output.stdout }}"
+
+# - name: Display K3s token
+#   ansible.builtin.debug:
+#     msg: "The K3s token is: {{ k3s_token }}"
+
+- name: Set global K3s token variable
+  ansible.builtin.set_fact:
+    K3S_TOKEN: "{{ k3s_token_output.stdout }}"
+  delegate_to: localhost
+
+- name: Save token to group_vars
+  ansible.builtin.copy:
+    dest: /path/to/inventory/group_vars/all.yml
+    content: |
+      K3S_TOKEN: "{{ k3s_token_output.stdout }}"
